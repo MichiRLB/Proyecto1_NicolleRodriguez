@@ -63,6 +63,18 @@ CREATE TABLE log_accesos (
     fecha_acceso TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE tareas(
+	id_tarea SERIAL PRIMARY KEY,
+	estados VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estados IN ('pendiente', 'en proceso', 'completada', 'vencida')), 
+	responsable VARCHAR(45) NOT NULL, 
+	prioridad VARCHAR(10) NOT NULL CHECK (prioridad IN ('baja', 'media', 'alta')),
+	descripcion TEXT,
+	titulo VARCHAR(50) NOT NULL,
+	fecha_limite DATE NOT NULL, 
+	id_evento INT NOT NULL REFERENCES eventos(id_evento),
+	id_usuario INT NOT NULL REFERENCES usuarios(id_usuario)
+    )	
+
 -- Implementación de Cálculos Dinámicos (RF07, RE03, RN03) mediante vistas
 
 -- Vista para Antigüedad
