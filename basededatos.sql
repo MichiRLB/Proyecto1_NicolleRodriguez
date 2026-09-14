@@ -63,17 +63,57 @@ CREATE TABLE log_accesos (
     fecha_acceso TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7. 
 CREATE TABLE tareas(
 	id_tarea SERIAL PRIMARY KEY,
-	estados VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estados IN ('pendiente', 'en proceso', 'completada', 'vencida')), 
-	responsable VARCHAR(45) NOT NULL, 
+	estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'en progreso', 'completada', 'cancelada')), 
 	prioridad VARCHAR(10) NOT NULL CHECK (prioridad IN ('baja', 'media', 'alta')),
 	descripcion TEXT,
-	titulo VARCHAR(50) NOT NULL,
+	titulo VARCHAR(100) NOT NULL,
 	fecha_limite DATE NOT NULL, 
 	id_evento INT NOT NULL REFERENCES eventos(id_evento),
 	id_usuario INT NOT NULL REFERENCES usuarios(id_usuario)
-    )	
+	
+);
+
+-- 8. 
+
+CREATE TABLE ubicaciones(
+	id_ubicacion SERIAL PRIMARY KEY,
+	nombre VARCHAR(40) NOT NULL, 
+	direccion VARCHAR(50) NOT NULL,
+	capacidad INT NOT NULL,
+	ciudad VARCHAR(30) NOT NULL, 
+	CHECK (capacidad > 0)
+);
+
+ALTER TABLE eventos
+ADD COLUMN id_ubicacion INT NOT NULL REFERENCES ubicaciones(id_ubicacion);
+
+-- 9. 
+
+CREATE TABLE disponibilidades(
+	id_disponibilidad SERIAL PRIMARY KEY, 
+	hora_inicio TIME NOT NULL,
+	hora_fin TIME NOT NULL,
+	fecha DATE NOT NULL, 
+	id_usuario INT NOT NULL REFERENCES usuarios(id_usuario),
+	id_tipo_disponibilidad INT NOT NULL,
+	CONSTRAINT check_horario CHECK (hora_fin > hora_inicio)
+);
+
+-- 10.
+
+CREATE TABLE tipos_disponibilidad(
+	id_tipo_disponibilidad SERIAL PRIMARY KEY, 
+	nombre VARCHAR(30) NOT NULL UNIQUE CHECK (nombre IN ('disponible', 'ocupado', 'no disponible'))
+);
+
+INSERT INTO tipos_disponibilidad (nombre) VALUES ('disponible'), ('ocupado'), ('no disponible');
+
+ALTER TABLE disponibilidades
+ADD CONSTRAINT fk_tipo_disponibilidad
+FOREIGN KEY (id_tipo_disponibilidad) REFERENCES tipos_disponibilidad(id_tipo_disponibilidad);
 
 -- Implementación de Cálculos Dinámicos (RF07, RE03, RN03) mediante vistas
 
@@ -114,4 +154,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_evitar_ciclo
 BEFORE INSERT OR UPDATE ON categorias
 FOR EACH ROW EXECUTE FUNCTION evitar_ciclo_categorias();
- -- hola
