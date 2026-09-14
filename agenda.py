@@ -627,7 +627,7 @@ class AppAgenda(ctk.CTk):
         form = ctk.CTkScrollableFrame(cuerpo, width=350); form.grid(row=0, column=1, sticky="nsew")
         
         self.tree_ubicaciones = self.crear_treeview(
-            tabla, ("ID", "Nombre del lugar", "Dirección exacta", "Ciudad", "Capacidad"),
+            tabla, ("ID", "Nombre", "Dirección", "Ciudad", "Capacidad"),
             (70, 170, 150, 220, 150)
             )
         
@@ -636,6 +636,23 @@ class AppAgenda(ctk.CTk):
             self.cargar_ubicacion_seleccionada
         )
 
+        ctk.CTkLabel(form, text="Formulario de ubicacion", font=ctk.CTkFont(size=15, weight="bold")).pack(pady=(10,15))
+        self.entry_ubi_nombre = ctk.CTkEntry(form, placeholder_text= "Nombre del recinto")
+        self.entry_ubi_nombre.pack(fill="x", padx=10, pady=6)
+        self.entry_ubi_direccion = ctk.CTkEntry(form,placeholder_text="Dirección")
+        self.entry_ubi_direccion.pack(fill="x", padx=10, pady=6)
+        self.entry_ubi_ciudad = ctk.CTkEntry(form, placeholder_text="Ciudad")
+        self.entry_ubi_ciudad.pack(fill="x", padx=10, pady=6)
+        self.entry_ubi_capacidad = ctk.CTkEntry(form, placeholder_text="Capacidad")
+        self.entry_ubi_capacidad.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkButton(form,text="Registrar ubicacion", command= self.agregar_ubicacion).pack(fill="x", padx=10, pady=(15,5))
+        ctk.CTkButton(form,text="Actualizar seleccionada", command=self.actualizar_ubicacion).pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(form, text="Nueva / Limpiar", command=self.limpiar_form_ubicacion, fg_color="gray").pack(fill="x", padx=10, pady=5)
+        ctk.CTkButton(form, text="Eliminar seleccionada", command=self.eliminar_ubicacion,
+                    fg_color="#b33939", hover_color="#8f2d2d").pack(fill="x", padx=10, pady=5)
+
+    
     def ubicacion_seleccionada_id(self):
         sel = self.tree_ubicaciones_selection()
 
@@ -664,23 +681,33 @@ class AppAgenda(ctk.CTk):
         nombre = self.entry_ubi_nombre.get().strip()
         direccion = self.entry_ubi_direccion.get().strip()
         ciudad = self.entry_ubi_ciudad.get().strip()
-        capacidad = self.entry_ubi_ciudad.get().strip()
+        capacidad = self.entry_ubi_capacidad.get().strip()
+
         if not nombre or not direccion or not ciudad or not capacidad:
             raise ValueError("Todos los campos son obligatorios")
-        if not capacidad.isfigit() or int(capacidad) <= 0:
+        
+        if not capacidad.isdigit() or int(capacidad) <= 0:
             raise ValueError("La capacidad debe ser un numero entero mayor a 0.")
-        return nombre,direccion,ciudad,int(capacidad)
+        return nombre, direccion, ciudad, int(capacidad)
+    
 
     def agregar_ubicacion(self): 
         try:
             datos = self._datos_ubicacion_formulario()
+
             self.ejecutar_consulta(
-                "INSERT INTO ubicaciones (nombre, direccion, ciudad, capacidad) VALUES (%s, $s, %s, %s)",
+                """
+                INSERT INTO ubicaciones 
+                    (nombre, direccion, ciudad, capacidad)
+                    VALUES (%s, %s, %s, %s)
+                """,
                 datos
+                
             )
 
-            self.limpiar_form_ubicacion(); self.actualizar_todas_las_tablas()
-            messagebox.showingo("Exito", "Ubicacion registrada correctamente")
+            self.limpiar_form_ubicacion(); 
+            self.actualizar_todas_las_tablas()
+            messagebox.showinfo("Exito", "Ubicación registrada correctamente")
         except ValueError as e:
             messagebox.showwarning("Datos invalidos", str(e))
 
@@ -694,11 +721,11 @@ class AppAgenda(ctk.CTk):
         try:
             nombre, direccion, ciudad, capacidad = self._datos_ubicacion_formulario()
             self.ejecutar_consulta(
-                "UPDATE ubicaciones SET nombre=%s, direccion=%s, ciudad=%s, capacidad=%s WHERE id_ubicacion=%s",
+                "UPDATE ubicaciones SET nombre=%s, dirección=%s, ciudad=%s, capacidad=%s WHERE id_ubicacion=%s",
                 (nombre, direccion, ciudad, capacidad, uid)
             )
             self.actualizar_todas_las_tablas ()
-            messagebox.showinfo("Exito", "Ubicacion actualizada")
+            messagebox.showinfo("Exito", "Ubicación actualizada")
         except ValueError as e:
             messagebox.showwarning("Datos inválidos", str(e))
         except Exception as e:
@@ -729,7 +756,7 @@ class AppAgenda(ctk.CTk):
                 "SELECT id_ubicacion, nombre, direccion, ciudad, capacidad FROM ubicaciones ORDER BY nombre",
                 fetch= True
             )
-            for item in self.tree_ubicaciones.get_childer():
+            for item in self.tree_ubicaciones.get_children():
                 self.tree_ubicaciones.delete(item)
             self.ubicaciones_combo = {}
             for row in rows:
@@ -739,7 +766,7 @@ class AppAgenda(ctk.CTk):
         except Exception as e:
             print(f"Error cargando ubicaciones: {e}")
 
-            
+
 
 
 
