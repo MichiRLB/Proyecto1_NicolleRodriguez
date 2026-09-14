@@ -588,16 +588,18 @@ class AppAgenda(ctk.CTk):
                 FROM eventos e
                 JOIN usuarios u ON u.id_usuario = e.id_usuario_propietario
                 JOIN categorias c ON c.id_categoria = e.id_categoria
+                LEFT JOIN ubicaciones ub ON ub.id_ubicacion = e.id_ubicacion
                 ORDER BY e.fecha_inicio DESC
-            """, fetch=True)
+                """, fetch=True)
             for item in self.tree_eventos.get_children(): 
                 self.tree_eventos.delete(item)
 
-            self.eventos_combos = {}
+            self.eventos_combo = {}
 
             for row in rows:
                 usuario = f"{row[2]} {row[3]} — #{row[1]}"
                 categoria = f"{row[5]} — #{row[4]}"
+                ubicacion = f"{row[7]} - #{row[8]} (#{row[6]})" if row[6] is not None else ""
                 inicio = row[7].strftime("%Y-%m-%d %H:%M") if hasattr(row[7], "strftime") else row[7]
                 fin = row[8].strftime("%Y-%m-%d %H:%M") if hasattr(row[8], "strftime") else row[8]
 
@@ -608,8 +610,12 @@ class AppAgenda(ctk.CTk):
 
             valores_u = ["Seleccione un usuario"] + list(self.usuarios_combo.keys())
             valores_c = ["Seleccione una categoría"] + list(self.categorias_combo.keys())
+           # valores_e = ["Seleccione un evento"] + list(self.eventos_combo.keys())
+            valores_ub = ["Seleccione una ubicacion"] + list(self.ubicaciones_combo.keys())
             self.combo_ev_usuario.configure(values=valores_u)
             self.combo_ev_categoria.configure(values=valores_c)
+           # self.combo_ev_evento.configure(values=valores_e)
+            self.combo_ev_ubicacion.configure(values=valores_ub)
         except Exception as e:
             print(f"Error cargando eventos: {e}")
 
@@ -645,6 +651,11 @@ class AppAgenda(ctk.CTk):
         self.entry_ubi_ciudad.pack(fill="x", padx=10, pady=6)
         self.entry_ubi_capacidad = ctk.CTkEntry(form, placeholder_text="Capacidad")
         self.entry_ubi_capacidad.pack(fill="x", padx=10, pady=6)
+        self.combo_ev_ubicacion = ctk.CTkComboBox(form, values=["Seleccione una ubicación"], state="readonly")
+
+        self.combo_ev_ubicacion.set("Seleccione una ubicación")
+
+        self.combo_ev_ubicacion.pack(fill="x", padx=10, pady=4)
 
         ctk.CTkButton(form,text="Registrar ubicacion", command= self.agregar_ubicacion).pack(fill="x", padx=10, pady=(15,5))
         ctk.CTkButton(form,text="Actualizar seleccionada", command=self.actualizar_ubicacion).pack(fill="x", padx=10, pady=5)
@@ -654,7 +665,7 @@ class AppAgenda(ctk.CTk):
 
     
     def ubicacion_seleccionada_id(self):
-        sel = self.tree_ubicaciones_selection()
+        sel = self.tree_ubicaciones.selection()
 
         if not sel:
             return None
@@ -721,7 +732,7 @@ class AppAgenda(ctk.CTk):
         try:
             nombre, direccion, ciudad, capacidad = self._datos_ubicacion_formulario()
             self.ejecutar_consulta(
-                "UPDATE ubicaciones SET nombre=%s, dirección=%s, ciudad=%s, capacidad=%s WHERE id_ubicacion=%s",
+                "UPDATE ubicaciones SET nombre=%s, direccion=%s, ciudad=%s, capacidad=%s WHERE id_ubicacion=%s",
                 (nombre, direccion, ciudad, capacidad, uid)
             )
             self.actualizar_todas_las_tablas ()
@@ -738,7 +749,7 @@ class AppAgenda(ctk.CTk):
         if not messagebox.askyesno("Confirmar", "¿Eliminar la ubicación seleccionada?"):
             return
         try:
-            self.ejecutar_consulta("DELETE FORM ubicaciones WHERE id_ubicacion=%s",(uid,))
+            self.ejecutar_consulta("DELETE FROM ubicaciones WHERE id_ubicacion=%s",(uid,))
             self.limpiar_form_ubicacion(); self.actualizar_todas_las_tablas()
             messagebox.showinfo("Eliminado", "Ubicacion eliminada.")
         except psycopg2.errors.ForeignKeyViolation:
@@ -763,6 +774,9 @@ class AppAgenda(ctk.CTk):
                 self.tree_ubicaciones.insert("", "end", values=row)
                 etiqueta = f"{row[1]} - {row[3]} (#{row[0]})"
                 self.ubicaciones_combo[etiqueta] = row[0]
+
+            #valores_hist = ["Seleccione una ubicación"] + list(self.ubicaciones_combo.keys()) 
+            #self.combo_historial_ubicacion.configure(values=valores_hist)
         except Exception as e:
             print(f"Error cargando ubicaciones: {e}")
 
@@ -776,6 +790,7 @@ class AppAgenda(ctk.CTk):
     def actualizar_todas_las_tablas(self):
         self.cargar_datos_usuarios()
         self.cargar_datos_categorias()
+        self.cargar_datos_ubicaciones()
         self.cargar_datos_eventos()
 
 
