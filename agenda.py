@@ -50,6 +50,8 @@ class AppAgenda(ctk.CTk):
         if DateEntry is None:
             self.after(500, lambda: messagebox.showwarning(
                 "Calendario no instalado"
+                "Para usar los selectores de fecha instala:\n\npip install tkcalendar"
+
             ))
 
     # -------------------- INFRAESTRUCTURA --------------------
@@ -132,8 +134,8 @@ class AppAgenda(ctk.CTk):
         for i, (nombre, icono) in enumerate([
             ("Usuarios", "👥"),
             ("Categorías", "📁"),
-            ("Eventos", "🗓️"),
             ("Ubicaciones", "📍"),
+            ("Eventos", "🗓️"),
             ("Disponibilidad", "📓"),
             ("Tareas", "📝"),
         ], start=2):
@@ -173,15 +175,15 @@ class AppAgenda(ctk.CTk):
 
         self.tab_usuarios = self.tabview.add("Usuarios")
         self.tab_categorias = self.tabview.add("Categorías")
-        self.tab_eventos = self.tabview.add("Eventos")
         self.tab_ubicaciones = self.tabview.add("Ubicaciones")
+        self.tab_eventos = self.tabview.add("Eventos")
         self.tab_disponibilidad = self.tabview.add("Disponibilidad")
         self.tab_tareas = self.tabview.add("Tareas")
 
         self.configurar_pestana_usuarios()
         self.configurar_pestana_categorias()
-        self.configurar_pestana_eventos()
         self.configurar_pestana_ubicaciones()
+        self.configurar_pestana_eventos()
         self.configurar_pestana_disponibilidad()
         self.configurar_pestana_tareas()
         self.seleccionar_modulo("Usuarios")
@@ -431,6 +433,305 @@ class AppAgenda(ctk.CTk):
                 self.combo_cat_padre.set("Sin categoría padre")
         except Exception as e:
             print(f"Error cargando categorías: {e}")
+
+    # -------------------- UBICACIONES --------------------
+    
+    def configurar_pestana_ubicaciones(self):
+            self.crear_encabezado(
+                self.tab_ubicaciones,
+                "Ubicaciones",
+                "Administra recintos y consulta el ranking de ocupación y demanda."
+            )
+    
+            cuerpo = ctk.CTkFrame(self.tab_ubicaciones, fg_color="transparent")
+            cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
+            cuerpo.grid_columnconfigure(0, weight=3)
+            cuerpo.grid_columnconfigure(1, weight=1)
+            cuerpo.grid_rowconfigure(0, weight=3)
+            cuerpo.grid_rowconfigure(1, weight=2)
+    
+            # ---------------- Requerimiento 08  ------------------
+            tabla = ctk.CTkFrame(cuerpo)
+            tabla.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+    
+            form = ctk.CTkScrollableFrame(cuerpo, width=350)
+            form.grid(row=0, column=1, sticky="nsew")
+    
+            self.tree_ubicaciones = self.crear_treeview(
+                tabla,
+                ("ID", "Nombre", "Dirección", "Ciudad", "Capacidad"),
+                (70, 170, 210, 150, 100)
+            )
+            self.tree_ubicaciones.bind(
+                "<<TreeviewSelect>>",
+                self.cargar_ubicacion_seleccionada
+            )
+    
+            ctk.CTkLabel(
+                form,
+                text="Formulario de ubicación",
+                font=ctk.CTkFont(size=15, weight="bold")
+            ).pack(pady=(10, 15))
+    
+            self.entry_ubi_nombre = ctk.CTkEntry(form, placeholder_text="Nombre del recinto")
+            self.entry_ubi_nombre.pack(fill="x", padx=10, pady=6)
+    
+            self.entry_ubi_direccion = ctk.CTkEntry(form, placeholder_text="Dirección")
+            self.entry_ubi_direccion.pack(fill="x", padx=10, pady=6)
+    
+            self.entry_ubi_ciudad = ctk.CTkEntry(form, placeholder_text="Ciudad")
+            self.entry_ubi_ciudad.pack(fill="x", padx=10, pady=6)
+    
+            self.entry_ubi_capacidad = ctk.CTkEntry(form, placeholder_text="Capacidad")
+            self.entry_ubi_capacidad.pack(fill="x", padx=10, pady=6)
+    
+            ctk.CTkButton(
+                form, text="➕ Registrar ubicación", command=self.agregar_ubicacion
+            ).pack(fill="x", padx=10, pady=(15, 5))
+    
+            ctk.CTkButton(
+                form, text="💾 Actualizar seleccionada", command=self.actualizar_ubicacion
+            ).pack(fill="x", padx=10, pady=5)
+    
+            ctk.CTkButton(
+                form,
+                text="🧹 Nueva / Limpiar",
+                command=self.limpiar_form_ubicacion,
+                fg_color="gray"
+            ).pack(fill="x", padx=10, pady=5)
+    
+            ctk.CTkButton(
+                form,
+                text="🗑️ Eliminar seleccionada",
+                command=self.eliminar_ubicacion,
+                fg_color="#b33939",
+                hover_color="#8f2d2d"
+            ).pack(fill="x", padx=10, pady=5)
+    
+            # ---------------- Requerimiento 10: Reporte analítico ----------------
+            reporte_frame = ctk.CTkFrame(cuerpo)
+            reporte_frame.grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                sticky="nsew",
+                pady=(10, 0)
+            )
+    
+            ctk.CTkLabel(
+                reporte_frame,
+                text="📊 Reporte de ocupación y demanda de espacios",
+                font=ctk.CTkFont(size=16, weight="bold")
+            ).pack(anchor="w", padx=15, pady=(12, 2))
+    
+            ctk.CTkLabel(
+                reporte_frame,
+                text="Ranking dinámico de recintos según la cantidad de eventos asociados.",
+                font=ctk.CTkFont(size=11)
+            ).pack(anchor="w", padx=15, pady=(0, 4))
+    
+            self.label_resumen_ubicaciones = ctk.CTkLabel(
+                reporte_frame,
+                text="Cargando información...",
+                font=ctk.CTkFont(size=12)
+            )
+            self.label_resumen_ubicaciones.pack(anchor="w", padx=15, pady=(0, 8))
+    
+            
+            self.tree_reporte_ubicaciones = self.crear_treeview(
+                reporte_frame,
+                ("Ranking", "Ubicación", "Ciudad", "Capacidad", "Eventos agendados", "Demanda"),
+                (80, 220, 150, 100, 145, 100)
+            )
+    
+    def ubicacion_seleccionada_id(self):
+            sel = self.tree_ubicaciones.selection()
+            if not sel:
+                return None
+            return self.tree_ubicaciones.item(sel[0])["values"][0]
+    
+    def cargar_ubicacion_seleccionada(self, _=None):
+            sel = self.tree_ubicaciones.selection()
+            if not sel:
+                return
+    
+            vals = self.tree_ubicaciones.item(sel[0])["values"]
+            self.entry_ubi_nombre.delete(0, tk.END)
+            self.entry_ubi_nombre.insert(0, vals[1])
+            self.entry_ubi_direccion.delete(0, tk.END)
+            self.entry_ubi_direccion.insert(0, vals[2])
+            self.entry_ubi_ciudad.delete(0, tk.END)
+            self.entry_ubi_ciudad.insert(0, vals[3])
+            self.entry_ubi_capacidad.delete(0, tk.END)
+            self.entry_ubi_capacidad.insert(0, vals[4])
+    
+    def limpiar_form_ubicacion(self):
+            self.tree_ubicaciones.selection_remove(self.tree_ubicaciones.selection())
+            self.entry_ubi_nombre.delete(0, tk.END)
+            self.entry_ubi_direccion.delete(0, tk.END)
+            self.entry_ubi_ciudad.delete(0, tk.END)
+            self.entry_ubi_capacidad.delete(0, tk.END)
+    
+    def _datos_ubicacion_formulario(self):
+            nombre = self.entry_ubi_nombre.get().strip()
+            direccion = self.entry_ubi_direccion.get().strip()
+            ciudad = self.entry_ubi_ciudad.get().strip()
+            capacidad = self.entry_ubi_capacidad.get().strip()
+    
+            if not nombre or not direccion or not ciudad or not capacidad:
+                raise ValueError("Todos los campos son obligatorios.")
+    
+            if not capacidad.isdigit() or int(capacidad) <= 0:
+                raise ValueError("La capacidad debe ser un número entero mayor a 0.")
+    
+            return nombre, direccion, ciudad, int(capacidad)
+    
+    def agregar_ubicacion(self):
+            try:
+                datos = self._datos_ubicacion_formulario()
+                self.ejecutar_consulta("""
+                    INSERT INTO ubicaciones (nombre, direccion, ciudad, capacidad)
+                    VALUES (%s, %s, %s, %s)
+                """, datos)
+    
+                self.limpiar_form_ubicacion()
+                self.actualizar_todas_las_tablas()
+                messagebox.showinfo("Éxito", "Ubicación registrada correctamente.")
+            except ValueError as e:
+                messagebox.showwarning("Datos inválidos", str(e))
+            except Exception as e:
+                messagebox.showerror("Error de base de datos", str(e))
+    
+    def actualizar_ubicacion(self):
+            uid = self.ubicacion_seleccionada_id()
+            if uid is None:
+                return messagebox.showwarning(
+                    "Selección requerida",
+                    "Selecciona una ubicación para actualizar."
+                )
+    
+            try:
+                nombre, direccion, ciudad, capacidad = self._datos_ubicacion_formulario()
+                self.ejecutar_consulta(
+                    """
+                    UPDATE ubicaciones
+                    SET nombre=%s, direccion=%s, ciudad=%s, capacidad=%s
+                    WHERE id_ubicacion=%s
+                    """,
+                    (nombre, direccion, ciudad, capacidad, uid)
+                )
+                self.actualizar_todas_las_tablas()
+                messagebox.showinfo("Éxito", "Ubicación actualizada.")
+            except ValueError as e:
+                messagebox.showwarning("Datos inválidos", str(e))
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+    
+    def eliminar_ubicacion(self):
+            uid = self.ubicacion_seleccionada_id()
+            if uid is None:
+                return messagebox.showwarning(
+                    "Selección requerida",
+                    "Selecciona una ubicación."
+                )
+    
+            if not messagebox.askyesno("Confirmar", "¿Eliminar la ubicación seleccionada?"):
+                return
+    
+            try:
+                self.ejecutar_consulta(
+                    "DELETE FROM ubicaciones WHERE id_ubicacion=%s",
+                    (uid,)
+                )
+                self.limpiar_form_ubicacion()
+                self.actualizar_todas_las_tablas()
+                messagebox.showinfo("Eliminado", "Ubicación eliminada.")
+            except psycopg2.errors.ForeignKeyViolation:
+                messagebox.showerror(
+                    "No se puede eliminar",
+                    "Esta ubicación tiene eventos asociados. Elimina o reasigna esos eventos primero."
+                )
+            except Exception as e:
+                messagebox.showerror("No se pudo eliminar", str(e))
+    
+    def cargar_datos_ubicaciones(self):
+            try:
+                rows = self.ejecutar_consulta(
+                    """
+                    SELECT id_ubicacion, nombre, direccion, ciudad, capacidad
+                    FROM ubicaciones
+                    ORDER BY nombre
+                    """,
+                    fetch=True
+                )
+    
+                for item in self.tree_ubicaciones.get_children():
+                    self.tree_ubicaciones.delete(item)
+    
+                self.ubicaciones_combo = {}
+    
+                for row in rows:
+                    self.tree_ubicaciones.insert("", "end", values=row)
+                    etiqueta = f"{row[1]} - {row[3]} (#{row[0]})"
+                    self.ubicaciones_combo[etiqueta] = row[0]
+    
+            except Exception as e:
+                print(f"Error cargando ubicaciones: {e}")
+    
+    def cargar_reporte_ubicaciones(self):
+            """Requirimiento 10"""
+            try:
+                rows = self.ejecutar_consulta("""
+                    SELECT
+                        ub.nombre,
+                        ub.ciudad,
+                        ub.capacidad,
+                        COUNT(e.id_evento) AS total_eventos
+                    FROM ubicaciones ub
+                    LEFT JOIN eventos e
+                        ON e.id_ubicacion = ub.id_ubicacion
+                    GROUP BY ub.id_ubicacion, ub.nombre, ub.ciudad, ub.capacidad
+                    ORDER BY total_eventos DESC, ub.nombre
+                """, fetch=True)
+    
+                for item in self.tree_reporte_ubicaciones.get_children():
+                    self.tree_reporte_ubicaciones.delete(item)
+    
+                total_eventos = sum(row[3] for row in rows)
+                ubicaciones_sin_uso = 0
+    
+                for posicion, row in enumerate(rows, start=1):
+                    nombre, ciudad, capacidad, eventos = row
+    
+                    if eventos == 0:
+                        ubicaciones_sin_uso += 1
+    
+                    if total_eventos == 0:
+                        porcentaje = 0
+                    else:
+                        porcentaje = round((eventos * 100) / total_eventos, 2)
+    
+                    self.tree_reporte_ubicaciones.insert(
+                        "",
+                        "end",
+                        values=(
+                            posicion, nombre, ciudad, capacidad, eventos,f"{porcentaje}%")
+                    )
+    
+                self.label_resumen_ubicaciones.configure(
+                    text=(
+                        f"Ubicaciones: {len(rows)}   |   "
+                        f"Eventos asociados: {total_eventos}   |   "
+                        f"Ubicaciones sin uso: {ubicaciones_sin_uso}"
+                    )
+                )
+    
+            except Exception as e:
+                print(f"Error cargando reporte de ubicaciones: {e}")
+                self.label_resumen_ubicaciones.configure(
+                    text="No se pudo cargar el reporte. Revisa que eventos tenga la columna id_ubicacion."
+                )
+    
 
     # -------------------- EVENTOS --------------------
 
@@ -771,303 +1072,7 @@ class AppAgenda(ctk.CTk):
             print(f"Error cargando eventos: {e}")
 
 
-    # -------------------- UBICACIONES --------------------
-
-    def configurar_pestana_ubicaciones(self):
-        self.crear_encabezado(
-            self.tab_ubicaciones,
-            "Ubicaciones",
-            "Administra recintos y consulta el ranking de ocupación y demanda."
-        )
-
-        cuerpo = ctk.CTkFrame(self.tab_ubicaciones, fg_color="transparent")
-        cuerpo.pack(fill="both", expand=True, padx=10, pady=5)
-        cuerpo.grid_columnconfigure(0, weight=3)
-        cuerpo.grid_columnconfigure(1, weight=1)
-        cuerpo.grid_rowconfigure(0, weight=3)
-        cuerpo.grid_rowconfigure(1, weight=2)
-
-        # ---------------- Requerimiento 08  ------------------
-        tabla = ctk.CTkFrame(cuerpo)
-        tabla.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-
-        form = ctk.CTkScrollableFrame(cuerpo, width=350)
-        form.grid(row=0, column=1, sticky="nsew")
-
-        self.tree_ubicaciones = self.crear_treeview(
-            tabla,
-            ("ID", "Nombre", "Dirección", "Ciudad", "Capacidad"),
-            (70, 170, 210, 150, 100)
-        )
-        self.tree_ubicaciones.bind(
-            "<<TreeviewSelect>>",
-            self.cargar_ubicacion_seleccionada
-        )
-
-        ctk.CTkLabel(
-            form,
-            text="Formulario de ubicación",
-            font=ctk.CTkFont(size=15, weight="bold")
-        ).pack(pady=(10, 15))
-
-        self.entry_ubi_nombre = ctk.CTkEntry(form, placeholder_text="Nombre del recinto")
-        self.entry_ubi_nombre.pack(fill="x", padx=10, pady=6)
-
-        self.entry_ubi_direccion = ctk.CTkEntry(form, placeholder_text="Dirección")
-        self.entry_ubi_direccion.pack(fill="x", padx=10, pady=6)
-
-        self.entry_ubi_ciudad = ctk.CTkEntry(form, placeholder_text="Ciudad")
-        self.entry_ubi_ciudad.pack(fill="x", padx=10, pady=6)
-
-        self.entry_ubi_capacidad = ctk.CTkEntry(form, placeholder_text="Capacidad")
-        self.entry_ubi_capacidad.pack(fill="x", padx=10, pady=6)
-
-        ctk.CTkButton(
-            form, text="➕ Registrar ubicación", command=self.agregar_ubicacion
-        ).pack(fill="x", padx=10, pady=(15, 5))
-
-        ctk.CTkButton(
-            form, text="💾 Actualizar seleccionada", command=self.actualizar_ubicacion
-        ).pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkButton(
-            form,
-            text="🧹 Nueva / Limpiar",
-            command=self.limpiar_form_ubicacion,
-            fg_color="gray"
-        ).pack(fill="x", padx=10, pady=5)
-
-        ctk.CTkButton(
-            form,
-            text="🗑️ Eliminar seleccionada",
-            command=self.eliminar_ubicacion,
-            fg_color="#b33939",
-            hover_color="#8f2d2d"
-        ).pack(fill="x", padx=10, pady=5)
-
-        # ---------------- Requerimiento 10: Reporte analítico ----------------
-        reporte_frame = ctk.CTkFrame(cuerpo)
-        reporte_frame.grid(
-            row=1,
-            column=0,
-            columnspan=2,
-            sticky="nsew",
-            pady=(10, 0)
-        )
-
-        ctk.CTkLabel(
-            reporte_frame,
-            text="📊 Reporte de ocupación y demanda de espacios",
-            font=ctk.CTkFont(size=16, weight="bold")
-        ).pack(anchor="w", padx=15, pady=(12, 2))
-
-        ctk.CTkLabel(
-            reporte_frame,
-            text="Ranking dinámico de recintos según la cantidad de eventos asociados.",
-            font=ctk.CTkFont(size=11)
-        ).pack(anchor="w", padx=15, pady=(0, 4))
-
-        self.label_resumen_ubicaciones = ctk.CTkLabel(
-            reporte_frame,
-            text="Cargando información...",
-            font=ctk.CTkFont(size=12)
-        )
-        self.label_resumen_ubicaciones.pack(anchor="w", padx=15, pady=(0, 8))
-
-        
-        self.tree_reporte_ubicaciones = self.crear_treeview(
-            reporte_frame,
-            ("Ranking", "Ubicación", "Ciudad", "Capacidad", "Eventos agendados", "Demanda"),
-            (80, 220, 150, 100, 145, 100)
-        )
-
-    def ubicacion_seleccionada_id(self):
-        sel = self.tree_ubicaciones.selection()
-        if not sel:
-            return None
-        return self.tree_ubicaciones.item(sel[0])["values"][0]
-
-    def cargar_ubicacion_seleccionada(self, _=None):
-        sel = self.tree_ubicaciones.selection()
-        if not sel:
-            return
-
-        vals = self.tree_ubicaciones.item(sel[0])["values"]
-        self.entry_ubi_nombre.delete(0, tk.END)
-        self.entry_ubi_nombre.insert(0, vals[1])
-        self.entry_ubi_direccion.delete(0, tk.END)
-        self.entry_ubi_direccion.insert(0, vals[2])
-        self.entry_ubi_ciudad.delete(0, tk.END)
-        self.entry_ubi_ciudad.insert(0, vals[3])
-        self.entry_ubi_capacidad.delete(0, tk.END)
-        self.entry_ubi_capacidad.insert(0, vals[4])
-
-    def limpiar_form_ubicacion(self):
-        self.tree_ubicaciones.selection_remove(self.tree_ubicaciones.selection())
-        self.entry_ubi_nombre.delete(0, tk.END)
-        self.entry_ubi_direccion.delete(0, tk.END)
-        self.entry_ubi_ciudad.delete(0, tk.END)
-        self.entry_ubi_capacidad.delete(0, tk.END)
-
-    def _datos_ubicacion_formulario(self):
-        nombre = self.entry_ubi_nombre.get().strip()
-        direccion = self.entry_ubi_direccion.get().strip()
-        ciudad = self.entry_ubi_ciudad.get().strip()
-        capacidad = self.entry_ubi_capacidad.get().strip()
-
-        if not nombre or not direccion or not ciudad or not capacidad:
-            raise ValueError("Todos los campos son obligatorios.")
-
-        if not capacidad.isdigit() or int(capacidad) <= 0:
-            raise ValueError("La capacidad debe ser un número entero mayor a 0.")
-
-        return nombre, direccion, ciudad, int(capacidad)
-
-    def agregar_ubicacion(self):
-        try:
-            datos = self._datos_ubicacion_formulario()
-            self.ejecutar_consulta("""
-                INSERT INTO ubicaciones (nombre, direccion, ciudad, capacidad)
-                VALUES (%s, %s, %s, %s)
-            """, datos)
-
-            self.limpiar_form_ubicacion()
-            self.actualizar_todas_las_tablas()
-            messagebox.showinfo("Éxito", "Ubicación registrada correctamente.")
-        except ValueError as e:
-            messagebox.showwarning("Datos inválidos", str(e))
-        except Exception as e:
-            messagebox.showerror("Error de base de datos", str(e))
-
-    def actualizar_ubicacion(self):
-        uid = self.ubicacion_seleccionada_id()
-        if uid is None:
-            return messagebox.showwarning(
-                "Selección requerida",
-                "Selecciona una ubicación para actualizar."
-            )
-
-        try:
-            nombre, direccion, ciudad, capacidad = self._datos_ubicacion_formulario()
-            self.ejecutar_consulta(
-                """
-                UPDATE ubicaciones
-                SET nombre=%s, direccion=%s, ciudad=%s, capacidad=%s
-                WHERE id_ubicacion=%s
-                """,
-                (nombre, direccion, ciudad, capacidad, uid)
-            )
-            self.actualizar_todas_las_tablas()
-            messagebox.showinfo("Éxito", "Ubicación actualizada.")
-        except ValueError as e:
-            messagebox.showwarning("Datos inválidos", str(e))
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
-    def eliminar_ubicacion(self):
-        uid = self.ubicacion_seleccionada_id()
-        if uid is None:
-            return messagebox.showwarning(
-                "Selección requerida",
-                "Selecciona una ubicación."
-            )
-
-        if not messagebox.askyesno("Confirmar", "¿Eliminar la ubicación seleccionada?"):
-            return
-
-        try:
-            self.ejecutar_consulta(
-                "DELETE FROM ubicaciones WHERE id_ubicacion=%s",
-                (uid,)
-            )
-            self.limpiar_form_ubicacion()
-            self.actualizar_todas_las_tablas()
-            messagebox.showinfo("Eliminado", "Ubicación eliminada.")
-        except psycopg2.errors.ForeignKeyViolation:
-            messagebox.showerror(
-                "No se puede eliminar",
-                "Esta ubicación tiene eventos asociados. Elimina o reasigna esos eventos primero."
-            )
-        except Exception as e:
-            messagebox.showerror("No se pudo eliminar", str(e))
-
-    def cargar_datos_ubicaciones(self):
-        try:
-            rows = self.ejecutar_consulta(
-                """
-                SELECT id_ubicacion, nombre, direccion, ciudad, capacidad
-                FROM ubicaciones
-                ORDER BY nombre
-                """,
-                fetch=True
-            )
-
-            for item in self.tree_ubicaciones.get_children():
-                self.tree_ubicaciones.delete(item)
-
-            self.ubicaciones_combo = {}
-
-            for row in rows:
-                self.tree_ubicaciones.insert("", "end", values=row)
-                etiqueta = f"{row[1]} - {row[3]} (#{row[0]})"
-                self.ubicaciones_combo[etiqueta] = row[0]
-
-        except Exception as e:
-            print(f"Error cargando ubicaciones: {e}")
-
-    def cargar_reporte_ubicaciones(self):
-        """Requirimiento 10"""
-        try:
-            rows = self.ejecutar_consulta("""
-                SELECT
-                    ub.nombre,
-                    ub.ciudad,
-                    ub.capacidad,
-                    COUNT(e.id_evento) AS total_eventos
-                FROM ubicaciones ub
-                LEFT JOIN eventos e
-                    ON e.id_ubicacion = ub.id_ubicacion
-                GROUP BY ub.id_ubicacion, ub.nombre, ub.ciudad, ub.capacidad
-                ORDER BY total_eventos DESC, ub.nombre
-            """, fetch=True)
-
-            for item in self.tree_reporte_ubicaciones.get_children():
-                self.tree_reporte_ubicaciones.delete(item)
-
-            total_eventos = sum(row[3] for row in rows)
-            ubicaciones_sin_uso = 0
-
-            for posicion, row in enumerate(rows, start=1):
-                nombre, ciudad, capacidad, eventos = row
-
-                if eventos == 0:
-                    ubicaciones_sin_uso += 1
-
-                if total_eventos == 0:
-                    porcentaje = 0
-                else:
-                    porcentaje = round((eventos * 100) / total_eventos, 2)
-
-                self.tree_reporte_ubicaciones.insert(
-                    "",
-                    "end",
-                    values=(
-                        posicion, nombre, ciudad, capacidad, eventos,f"{porcentaje}%")
-                )
-
-            self.label_resumen_ubicaciones.configure(
-                text=(
-                    f"Ubicaciones: {len(rows)}   |   "
-                    f"Eventos asociados: {total_eventos}   |   "
-                    f"Ubicaciones sin uso: {ubicaciones_sin_uso}"
-                )
-            )
-
-        except Exception as e:
-            print(f"Error cargando reporte de ubicaciones: {e}")
-            self.label_resumen_ubicaciones.configure(
-                text="No se pudo cargar el reporte. Revisa que eventos tenga la columna id_ubicacion."
-            )
+          # --------------------- DISPONIBILIDAD -------------------
 
     def configurar_pestana_disponibilidad(self):
         self.crear_encabezado(
@@ -1384,6 +1389,7 @@ class AppAgenda(ctk.CTk):
         except Exception as e:
             messagebox.showerror("No se pudo eliminar", str(e))
 
+    # ------------------ Tipos de disponibilidades ----------------------
     def cargar_datos_disponibilidades(self):
         try:
             tipos = self.ejecutar_consulta("""
@@ -1552,6 +1558,7 @@ class AppAgenda(ctk.CTk):
         except Exception as e:
             messagebox.showerror("No se pudo realizar el análisis", str(e))
 
+    # ------------------------- Tareas ----------------------------
     def configurar_pestana_tareas(self):
         self.crear_encabezado(
             self.tab_tareas,
